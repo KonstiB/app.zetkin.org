@@ -34,11 +34,16 @@ import {
 } from 'features/public/hooks/useSurveyFormState';
 
 type PublicSurveyPageProps = {
+  privacyUrl: string;
   survey: ZetkinSurveyExtended;
   user: ZetkinUser | null;
 };
 
-const PublicSurveyPage: FC<PublicSurveyPageProps> = ({ survey, user }) => {
+const PublicSurveyPage: FC<PublicSurveyPageProps> = ({
+  privacyUrl,
+  survey,
+  user,
+}) => {
   const messages = useMessages(messageIds);
   const isMobile = useIsMobile();
   const [isLoading, setIsLoading] = useState(false);
@@ -77,6 +82,8 @@ const PublicSurveyPage: FC<PublicSurveyPageProps> = ({ survey, user }) => {
         setStatus(newState);
       } catch (e) {
         setStatus('error');
+      } finally {
+        setIsLoading(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,18 +106,9 @@ const PublicSurveyPage: FC<PublicSurveyPageProps> = ({ survey, user }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorMessageRef.current]);
 
-  useEffect(() => {
-    if (status == 'submitted' || status == 'error') {
-      setIsLoading(false);
-    }
-  }, [status]);
-
   const showForm = status == 'editing' || status == 'error';
   const showSuccess = status == 'submitted';
   const showErrorAlert = status == 'error';
-
-  const privacyUrl =
-    process.env.ZETKIN_PRIVACY_POLICY_LINK || 'https://zetkin.org/privacy';
 
   return (
     <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
@@ -264,9 +262,10 @@ const PublicSurveyPage: FC<PublicSurveyPageProps> = ({ survey, user }) => {
               <ZUIButton
                 actionType="submit"
                 dataTestId="Survey-submit"
+                isLoading={isLoading}
                 label={messages.surveyForm.submit()}
                 size="large"
-                variant={isLoading ? 'loading' : 'primary'}
+                variant="primary"
               />
             </Box>
           </form>

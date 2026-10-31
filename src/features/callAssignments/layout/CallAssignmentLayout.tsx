@@ -20,14 +20,16 @@ import useCallAssignmentState, {
   CallAssignmentState,
 } from '../hooks/useCallAssignmentState';
 import { ZUIConfirmDialogContext } from 'zui/ZUIConfirmDialogProvider';
-import ChangeCampaignDialog from '../../campaigns/components/ChangeCampaignDialog';
+import ChangeProjectDialog from '../../projects/components/ChangeProjectDialog';
 
 interface CallAssignmentLayoutProps {
   children: React.ReactNode;
+  removePadding?: boolean;
 }
 
 const CallAssignmentLayout: React.FC<CallAssignmentLayoutProps> = ({
   children,
+  removePadding = false,
 }) => {
   const messages = useMessages(messageIds);
   const { orgId, callAssId } = useNumericRouteParams();
@@ -61,20 +63,20 @@ const CallAssignmentLayout: React.FC<CallAssignmentLayoutProps> = ({
     return null;
   }
 
-  const handleOnCampaignSelected = async (campaignId: number) => {
+  const handleOnProjectSelected = async (projectId: number) => {
     const updatedCallAssignment = await updateCallAssignment({
-      campaign_id: campaignId,
+      campaign_id: projectId,
     });
     await router.push(
-      `/organize/${orgId}/projects/${campaignId}/callassignments/${
+      `/organize/${orgId}/projects/${projectId}/callassignments/${
         callAssignment!.id
       }`
     );
     showSnackbar(
       'success',
-      messages.callAssignmentChangeCampaignDialog.success({
+      messages.callAssignmentChangeProjectDialog.success({
         assignmentTitle: updatedCallAssignment.title,
-        campaignTitle: updatedCallAssignment.campaign!.title,
+        projectTitle: updatedCallAssignment.campaign!.title,
       })
     );
   };
@@ -127,6 +129,7 @@ const CallAssignmentLayout: React.FC<CallAssignmentLayoutProps> = ({
           startIcon: <Delete />,
         },
       ]}
+      noPad={removePadding}
       subtitle={
         <Box alignItems="center" display="flex">
           <Box marginRight={1}>
@@ -170,12 +173,12 @@ const CallAssignmentLayout: React.FC<CallAssignmentLayoutProps> = ({
               )}
             </ZUIFuture>
           </Box>
-          <ChangeCampaignDialog
-            errorMessage={messages.callAssignmentChangeCampaignDialog.error()}
-            onCampaignSelected={handleOnCampaignSelected}
+          <ChangeProjectDialog
+            errorMessage={messages.callAssignmentChangeProjectDialog.error()}
             onClose={() => setIsMoveDialogOpen(false)}
+            onProjectSelected={handleOnProjectSelected}
             open={isMoveDialogOpen}
-            title={messages.callAssignmentChangeCampaignDialog.title()}
+            title={messages.callAssignmentChangeProjectDialog.title()}
           />
         </Box>
       }
@@ -192,6 +195,7 @@ const CallAssignmentLayout: React.FC<CallAssignmentLayoutProps> = ({
           href: '/conversation',
           label: messages.tabs.conversation(),
         },
+        { href: '/calls', label: messages.tabs.calls() },
       ]}
       title={
         <ZUIEditTextinPlace

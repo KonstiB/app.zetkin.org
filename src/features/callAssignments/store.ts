@@ -5,36 +5,40 @@ import {
   RemoteItem,
   remoteList,
   RemoteList,
+  remoteListLoad,
+  remoteListLoaded,
 } from 'utils/storeUtils';
 import {
-  Call,
   CallAssignmentCaller,
   CallAssignmentData,
   CallAssignmentStats,
   ZetkinCallAssignmentStats,
 } from './apiTypes';
+import { ZetkinCall } from 'features/call/types';
 
 export interface CallAssignmentSlice {
   assignmentList: RemoteList<CallAssignmentData>;
-  callAssignmentIdsByCampaignId: Record<
+  callAssignmentIdsByProjectId: Record<
     number,
     RemoteList<{ id: string | number }>
   >;
   callersById: Record<number, RemoteList<CallAssignmentCaller>>;
-  callList: RemoteList<Call>;
+  callList: RemoteList<ZetkinCall>;
   simpleStatsById: Record<
     number,
     RemoteItem<ZetkinCallAssignmentStats & { id: number }>
   >;
+  callsByAssignmentId: Record<number, RemoteList<ZetkinCall>>;
   statsById: Record<number, RemoteItem<CallAssignmentStats>>;
   userAssignmentList: RemoteList<CallAssignmentData>;
 }
 
 const initialState: CallAssignmentSlice = {
   assignmentList: remoteList(),
-  callAssignmentIdsByCampaignId: {},
+  callAssignmentIdsByProjectId: {},
   callList: remoteList(),
   callersById: {},
+  callsByAssignmentId: {},
   simpleStatsById: {},
   statsById: {},
   userAssignmentList: remoteList(),
@@ -57,9 +61,9 @@ const callAssignmentsSlice = createSlice({
         remoteItem(callAssignment.id, { data: callAssignment })
       );
       if (callAssignment.campaign) {
-        state.callAssignmentIdsByCampaignId[callAssignment.campaign.id] =
+        state.callAssignmentIdsByProjectId[callAssignment.campaign.id] =
           remoteList([
-            ...state.callAssignmentIdsByCampaignId[callAssignment.campaign.id]
+            ...state.callAssignmentIdsByProjectId[callAssignment.campaign.id]
               .items,
             { id: callAssignment.id },
           ]);
@@ -165,7 +169,7 @@ const callAssignmentsSlice = createSlice({
           .concat(attributes);
       }
     },
-    callUpdated: (state, action: PayloadAction<[Call, string[]]>) => {
+    callUpdated: (state, action: PayloadAction<[ZetkinCall, string[]]>) => {
       const [call, mutating] = action.payload;
       const callItem = state.callList.items.find((item) => item.id == call.id);
 
@@ -178,6 +182,8 @@ const callAssignmentsSlice = createSlice({
       state.callList.items = state.callList.items
         .filter((c) => c.id != call?.id)
         .concat([remoteItem(call.id, { data: call })]);
+
+      state.callsByAssignmentId[call.assignment_id].isStale = true;
     },
     callerAdd: (state, action: PayloadAction<[number, number]>) => {
       const [assignmentId, callerId] = action.payload;
@@ -245,23 +251,33 @@ const callAssignmentsSlice = createSlice({
       state.callersById[assignmentId] = remoteList(callers);
       state.callersById[assignmentId].loaded = timestamp;
     },
-    campaignCallAssignmentsLoad: (state, action: PayloadAction<number>) => {
-      const campaignId = action.payload;
-      if (!state.callAssignmentIdsByCampaignId[campaignId]) {
-        state.callAssignmentIdsByCampaignId[campaignId] = remoteList();
-      }
-      state.callAssignmentIdsByCampaignId[campaignId].isLoading = true;
+    callsLoad: (state, action: PayloadAction<number>) => {
+      const callAssId = action.payload;
+      state.callsByAssignmentId[callAssId] = remoteListLoad(
+        state.callsByAssignmentId[callAssId] ?? null
+      );
     },
-    campaignCallAssignmentsLoaded: (
+    callsLoaded: (state, action: PayloadAction<[number, ZetkinCall[]]>) => {
+      const [callAssId, calls] = action.payload;
+      state.callsByAssignmentId[callAssId] = remoteListLoaded(calls);
+    },
+    projectCallAssignmentsLoad: (state, action: PayloadAction<number>) => {
+      const projectId = action.payload;
+      if (!state.callAssignmentIdsByProjectId[projectId]) {
+        state.callAssignmentIdsByProjectId[projectId] = remoteList();
+      }
+      state.callAssignmentIdsByProjectId[projectId].isLoading = true;
+    },
+    projectCallAssignmentsLoaded: (
       state,
       action: PayloadAction<[number, { id: string | number }[]]>
     ) => {
-      const [campaignId, callAssignmentIds] = action.payload;
+      const [projectId, callAssignmentIds] = action.payload;
       const timestamp = new Date().toISOString();
 
-      state.callAssignmentIdsByCampaignId[campaignId] =
+      state.callAssignmentIdsByProjectId[projectId] =
         remoteList(callAssignmentIds);
-      state.callAssignmentIdsByCampaignId[campaignId].loaded = timestamp;
+      state.callAssignmentIdsByProjectId[projectId].loaded = timestamp;
     },
     simpleStatsLoad: (state, action: PayloadAction<number>) => {
       const id = action.payload;
@@ -347,8 +363,10 @@ export const {
   callerRemoved,
   callersLoad,
   callersLoaded,
-  campaignCallAssignmentsLoad,
-  campaignCallAssignmentsLoaded,
+  callsLoad,
+  callsLoaded,
+  projectCallAssignmentsLoad,
+  projectCallAssignmentsLoaded,
   simpleStatsLoad,
   simpleStatsLoaded,
   statsLoad,

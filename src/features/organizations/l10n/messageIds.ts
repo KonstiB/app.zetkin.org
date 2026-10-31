@@ -13,6 +13,7 @@ export default makeMessages('feat.organizations', {
       organizations: m<{ numOrgs: number }>(
         '{numOrgs, plural,=0 {Organizations} =1 {1 organization} other {# organizations}}'
       ),
+      selectDate: m('Select a date'),
       thisWeek: m('This week'),
       today: m('Today'),
       tomorrow: m('Tomorrow'),
@@ -64,6 +65,7 @@ export default makeMessages('feat.organizations', {
       login: m('Login & connect'),
       organize: m('Organize'),
       unfollow: m('Unfollow'),
+      userMenu: m<{ initials: string }>('User menu ({initials})'),
     },
     map: {
       viewInList: m('View in list'),

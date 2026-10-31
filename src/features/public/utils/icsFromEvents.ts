@@ -1,23 +1,61 @@
+'use server';
+
 import dayjs, { Dayjs } from 'dayjs';
+import { createIntl, createIntlCache } from 'react-intl';
 
 import { ZetkinEvent, ZetkinOrganization } from 'utils/types/zetkin';
+import { getMessages } from 'utils/locale';
+import messageIds from 'features/public/l10n/messageIds';
+import { stringToBool } from 'utils/stringUtils';
 
-const timeStamp = (t: Dayjs): string => t.format('YYYYMMDDTHHmmss');
+// toISOString is used instead of format since we want the time without timezone
+// Otherwise the timezone would be applied twice in the ICS file
+const timeStamp = (t: Dayjs): string => {
+  let str = t.toISOString();
+  str = str.substring(0, str.lastIndexOf('.'));
+  str = str.replaceAll(':', '');
+  str = str.replaceAll('-', '');
+  return str;
+};
+
 const formatString = (str: string): string =>
   str
     .replaceAll('\n', '\\n')
     .match(/.{1,74}/g)
     ?.join('\r\n\t') ?? '';
 
-export default function icsFromEvents(
+export default async function icsFromEvents(
   name: string,
   events: ZetkinEvent[],
-  org: ZetkinOrganization
-): string {
+  org: ZetkinOrganization,
+  lang: string,
+  timeZone?: string
+): Promise<string> {
   const vLines: string[] = ['NAME:' + name, 'X-WR-CALNAME:' + name];
+
+  const messages = await getMessages(lang, ['feat.home']);
+
+  const joinEventCtaMsg =
+    messages['ics.joinEvent'] || messageIds.ics.joinEvent._defaultMessage;
+
+  const intlCache = createIntlCache();
+  const intl = createIntl({ locale: lang }, intlCache);
+
   events
     .filter((event) => !event.cancelled && event.published)
     .forEach((event) => {
+      const eventLink = `${stringToBool(process.env.ZETKIN_USE_TLS) ? 'https' : 'http'}://${process.env.ZETKIN_APP_HOST}/o/${org.id}/events/${event.id}`;
+
+      const joinEventCta = intl.formatMessage(
+        {
+          defaultMessage: joinEventCtaMsg,
+          id: 'feat.home.ics.joinEvent',
+        },
+        {
+          eventLink,
+        }
+      );
+
       vLines.push(`BEGIN:VEVENT`);
       vLines.push(`UID:${event.id}@${process.env.ZETKIN_APP_HOST}`);
       vLines.push(
@@ -25,18 +63,17 @@ export default function icsFromEvents(
           org.email ?? 'noreply@zetkin.org'
         }`
       );
-      vLines.push(`DTSTAMP:${timeStamp(dayjs(event.published))}`);
-      vLines.push(`DTSTART:${timeStamp(dayjs(event.start_time))}`);
-      vLines.push(`DTEND:${timeStamp(dayjs(event.end_time))}`);
+      const tz = timeZone !== undefined ? `;TZID=${timeZone}` : '';
+      vLines.push(`DTSTAMP${tz}:${timeStamp(dayjs(event.published))}`);
+      vLines.push(`DTSTART${tz}:${timeStamp(dayjs(event.start_time))}`);
+      vLines.push(`DTEND${tz}:${timeStamp(dayjs(event.end_time))}`);
       if (event.title || event.activity?.title) {
         vLines.push(`SUMMARY:${event.title || event.activity?.title || ''}`);
       }
-      if (event.info_text) {
-        vLines.push(`DESCRIPTION:${event.info_text ?? ''}`);
-      }
       vLines.push(
-        `URL:${process.env.ZETKIN_APP_HOST}/o/${org.id}/events/${event.id}`
+        `DESCRIPTION:${joinEventCta}${event.info_text ? '\n\n' + event.info_text : ''}`
       );
+      vLines.push(`URL:${eventLink}`);
       if (event.location) {
         vLines.push(`GEO:${event.location.lat};${event.location.lng}`);
         vLines.push(`LOCATION:${event.location.title}`);
